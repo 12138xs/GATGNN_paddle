@@ -1,9 +1,10 @@
 import numpy as np
-import torch
+import paddle
 import pandas as pd
 import os
 import shutil
 import argparse
+import pickle
 
 from   sklearn.model_selection import train_test_split
 from   sklearn.metrics import mean_absolute_error as sk_MAE
@@ -11,7 +12,7 @@ from   tabulate import tabulate
 import random,time
 
 def set_model_properties(crystal_property):
-    if crystal_property   in ['poisson-ratio','band-gap','absolute-energy','fermi-energy','formation-energy','new-property']        :
+    if crystal_property in ['poisson-ratio','band-gap','absolute-energy','fermi-energy','formation-energy','new-property']:
         norm_action   = None;classification = None
     elif crystal_property == 'is_metal':
         norm_action   = 'classification-1';classification = 1
@@ -21,11 +22,11 @@ def set_model_properties(crystal_property):
         norm_action   = 'log';classification = None
     return norm_action,classification
 
-def torch_MAE(tensor1,tensor2):
-    return torch.mean(torch.abs(tensor1-tensor2))
+def paddle_MAE(tensor1,tensor2):
+    return paddle.mean(paddle.abs(tensor1-tensor2))
 
-def torch_accuracy(pred_tensor,true_tensor):
-    _,pred_tensor   = torch.max(pred_tensor,dim=1)
+def paddle_accuracy(pred_tensor,true_tensor):
+    _,pred_tensor   = paddle.max(pred_tensor,dim=1)
     correct         = (pred_tensor==true_tensor).sum().float()
     total           = pred_tensor.size(0)
     accuracy_ans    = correct/total

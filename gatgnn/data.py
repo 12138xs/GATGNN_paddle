@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd 
 import functools
-import torch
 import pickle
-from torch.utils.data import Dataset
-from torch_geometric.data import Dataset as torch_Dataset
-from torch_geometric.data import Data, DataLoader as torch_DataLoader
+import paddle
+from paddle.io import Dataset
+from gammagl.data import Graph
+from gammagl.loader import DataLoader as paddle_loader
 import sys,json,os
 from pymatgen.core.structure import Structure
 from sklearn.cluster import KMeans
@@ -37,22 +37,23 @@ class ELEM_Encoder:
             ratio  = counts[idx]/total
             idx_e  = self.elements.index(elem)
             answer[idx_e] = ratio
-        return torch.tensor(answer).float().view(1,-1)
-    def decode_pymatgen_num(tensor_idx):
+        return paddle.to_tensor(answer, dtype='float32').reshape((1,-1))
+    
+    def decode_pymatgen_num(self,tensor_idx):
         idx      = (tensor_idx-1).cpu().tolist()
         return self.e_arr[idx]
         
 
 class DATA_normalizer:
     def __init__(self, array):
-        tensor = torch.tensor(array)
-        self.mean   = torch.mean(tensor)
-        self.std    = torch.std(tensor)
+        tensor = paddle.to_tensor(array)
+        self.mean   = paddle.mean(tensor)
+        self.std    = paddle.std(tensor)
     def reg(self,x):
         return x.float()
 
     def log10(self,x):
-        return torch.log10(x)
+        return paddle.log10(x)
 
     def delog10(self,x):
         return 10*x
@@ -64,15 +65,15 @@ class DATA_normalizer:
         return x * self.std + self.mean
 
 class METRICS:
-    def __init__(self,c_property,epoch,torch_criterion,torch_func,device):
+    def __init__(self,c_property,epoch,paddle_criterion,paddle_func,device):
         self.c_property        = c_property
-        self.criterion         = torch_criterion
-        self.eval_func         = torch_func
+        self.criterion         = paddle_criterion
+        self.eval_func         = paddle_func
         self.dv                = device
-        self.training_measure1 = torch.tensor(0.0).to(device)
-        self.training_measure2 = torch.tensor(0.0).to(device)
-        self.valid_measure1    = torch.tensor(0.0).to(device)
-        self.valid_measure2    = torch.tensor(0.0).to(device)
+        self.training_measure1 = paddle.to_tensor(0.0)
+        self.training_measure2 = paddle.to_tensor(0.0)
+        self.valid_measure1    = paddle.to_tensor(0.0)
+        self.valid_measure2    = paddle.to_tensor(0.0)
 
         self.training_counter  = 0
         self.valid_counter     = 0
@@ -126,8 +127,8 @@ class METRICS:
 
             self.training_loss1.append(t1.item())
             self.training_loss2.append(t2.item())
-            self.training_measure1 = torch.tensor(0.0).to(self.dv)
-            self.training_measure2 = torch.tensor(0.0).to(self.dv)
+            self.training_measure1 = paddle.to_tensor(0.0)
+            self.training_measure2 = paddle.to_tensor(0.0)
             self.training_counter  = 0 
         else:
             # AVERAGES
@@ -136,8 +137,8 @@ class METRICS:
 
             self.valid_loss1.append(v1.item())
             self.valid_loss2.append(v2.item())
-            self.valid_measure1    = torch.tensor(0.0).to(self.dv)
-            self.valid_measure2    = torch.tensor(0.0).to(self.dv)      
+            self.valid_measure1    = paddle.to_tensor(0.0)
+            self.valid_measure2    = paddle.to_tensor(0.0)      
             self.valid_counter     = 0 
     def save_info(self):
         with open('MODELS/metrics_.pickle','wb') as metrics_file:
@@ -211,26 +212,36 @@ class CIF_Lister(Dataset):
         i        = self.crystals_ids[idx]
         material = self.full_dataset[i]
 
-        n_features    = material[0][0]
-        e_features    = material[0][1]
-        e_features    = e_features.view(-1,41) if self.src in ['CGCNN','NEW'] else e_features.view(-1,9)
+        n_features    = material[0][0].astype('float32')
+        e_features    = material[0][1].astype('float32')
+        e_features    = paddle.reshape(e_features,(-1,41)) if self.src in ['CGCNN','NEW'] else paddle.reshape(e_features,(-1,9))
         a_matrix      = material[0][2]
 
         groups        = material[1]
-        enc_compo     = material[2]
+        enc_compo     = material[2].astype('float32')
         coordinates   = material[3]
         y             = material[4]
 
         if   self.normalization == None:    y = y
         elif self.normalization == 'log':   y = self.normalizer.log10(y)
         elif self.normalization == 'classification-1': 
-            if   y == 0:    y = torch.tensor([0]).long()
-            elif y == 1:    y = torch.tensor([1]).long()
+            if   y == 0:    y = paddle.to_tensor([0], dtype='int64')
+            elif y == 1:    y = paddle.to_tensor([1], dtype='int64')
         elif self.normalization == 'classification-0': 
-            if   y == 0:    y = torch.tensor([1]).long()
-            elif y == 1:    y = torch.tensor([0]).long()      
+            if   y == 0:    y = paddle.to_tensor([1], dtype='int64')
+            elif y == 1:    y = paddle.to_tensor([0], dtype='int64')      
 
-        graph_crystal = Data(x=n_features,y = y,edge_attr=e_features,edge_index=a_matrix,global_feature = enc_compo,cluster=groups,num_atoms=torch.tensor([len(n_features)]).float(),coords=coordinates,the_idx=torch.tensor([float(i)]))
+        graph_crystal = Graph(
+            x = n_features,
+            y = y,
+            edge_attr = e_features,
+            edge_index = a_matrix,
+            global_feature = enc_compo,
+            cluster = groups,
+            num_atoms = paddle.to_tensor([len(n_features)], dtype='float32'),
+            coords = coordinates,
+            the_idx = paddle.to_tensor([float(i)])
+        )
         return graph_crystal
 
 class CIF_Dataset(Dataset):
@@ -255,7 +266,7 @@ class CIF_Dataset(Dataset):
         cif_id, target = self.full_data.iloc[idx]
         crystal = Structure.from_file(os.path.join(self.root_dir, cif_id+'.cif'))
         atom_fea = np.vstack([self.ari.get_atom_fea(crystal[i].specie.number) for i in range(len(crystal))])
-        atom_fea = torch.Tensor(atom_fea)
+        atom_fea = paddle.to_tensor(atom_fea)
         all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
         all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
         nbr_fea_idx, nbr_fea = [], []
@@ -274,20 +285,21 @@ class CIF_Dataset(Dataset):
         if len(g_coords) > 2:
             try    : groups = self.clusterizer.fit_predict(g_coords)
             except : groups = self.clusterizer2.fit_predict(g_coords)
-        groups  = torch.tensor(groups).long()
+        groups  = paddle.to_tensor(groups, dtype='int64')
 
-        atom_fea     = torch.Tensor(atom_fea)
-        nbr_fea      = torch.Tensor(nbr_fea)
-        nbr_fea_idx  = self.format_adj_matrix(torch.LongTensor(nbr_fea_idx))
-        target       = torch.Tensor([float(target)])
+        atom_fea     = paddle.to_tensor(atom_fea)
+        nbr_fea      = paddle.to_tensor(nbr_fea)
+        nbr_fea_idx  = self.format_adj_matrix(paddle.to_tensor(nbr_fea_idx, dtype='int64'))
+        target       = paddle.to_tensor([float(target)])
 
-        coordinates = torch.tensor(g_coords) 
+        coordinates = paddle.to_tensor(g_coords) 
         enc_compo   = self.encoder_elem.encode(crystal.composition)
         return (atom_fea, nbr_fea, nbr_fea_idx),groups,enc_compo,coordinates, target, cif_id,[crystal[i].specie for i in range(len(crystal))]
 
     def format_adj_matrix(self,adj_matrix):
         size           = len(adj_matrix)
         src_list       = list(range(size))
-        all_src_nodes  = torch.tensor([[x]*adj_matrix.shape[1] for x in src_list]).view(-1).long().unsqueeze(0)
-        all_dst_nodes  = adj_matrix.view(-1).unsqueeze(0)
-        return torch.cat((all_src_nodes,all_dst_nodes),dim=0)
+        all_src_nodes  = paddle.to_tensor([[x]*adj_matrix.shape[1] for x in src_list], dtype='int64')
+        all_src_nodes  = paddle.reshape(all_src_nodes, (1,-1))
+        all_dst_nodes  = paddle.reshape(adj_matrix, (1,-1))
+        return paddle.concat((all_src_nodes,all_dst_nodes),axis=0)

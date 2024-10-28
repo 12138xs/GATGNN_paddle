@@ -1,6 +1,6 @@
 from gatgnn.data                   import *
 from gatgnn.model                  import *
-from gatgnn.pytorch_early_stopping import *
+# from gatgnn.pytorch_early_stopping import *
 from gatgnn.file_setter            import use_property
 from gatgnn.utils                  import *
 
@@ -36,7 +36,7 @@ args = parser.parse_args(sys.argv[1:])
 # GATGNN --- parameters
 crystal_property                      = args.property
 data_src                              = args.data_src
-source_comparison, training_num,RSM   = use_property(crystal_property,data_src)
+source_comparison, training_num, RSM  = use_property(crystal_property,data_src)
 norm_action, classification           = set_model_properties(crystal_property)
 if training_num == None: training_num = args.train_size
 
@@ -48,17 +48,25 @@ global_att                           = args.global_attention
 attention_technique                  = args.cluster_option
 concat_comp                          = args.concat_comp
 
+# PRINTING PARAMETERS
+print(f'> PROPERTY: {crystal_property} | DATA-SOURCE: {data_src}')
+print(f'> MODEL: {number_layers} LAYERS | {number_neurons} NEURONS | {n_heads} HEADS')
+print(f'> GLOBAL-ATTENTION: {global_att} | CLUSTER-OPTION: {attention_technique} | CONCAT-COMP: {concat_comp}')
+print(f'> TRAINING-SIZE: {training_num} | SOURCE-COMPARISON: {source_comparison} | RSM: {RSM}')
+print(f'> NORMALIZATION: {norm_action} | CLASSIFICATION: {classification}')
+
 # SETTING UP CODE TO RUN ON GPU
 gpu_id = 0
-device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
+paddle.device.set_device(f"gpu:{gpu_id}")
 
 # DATA PARAMETERS
-random_num          =  456;random.seed(random_num)
+random_num          =  456
+random.seed(random_num)
 
 # MODEL HYPER-PARAMETERS
 num_epochs      = 200
 learning_rate   = 5e-3
-batch_size      = 256
+batch_size      = 1 # 256
 
 stop_patience   = 150
 best_epoch      = 1
@@ -83,25 +91,43 @@ training_set       =  CIF_Lister(train_idx,CRYSTAL_DATA,NORMALIZER,norm_action,d
 validation_set     =  CIF_Lister(val_idx,CRYSTAL_DATA,NORMALIZER,norm_action,  df=dataset,src=data_src)
 
 # NEURAL-NETWORK
-the_network    = GATGNN(n_heads,classification,neurons=number_neurons,nl=number_layers,xtra_layers=xtra_l,global_attention=global_att,
-                                      unpooling_technique=attention_technique,concat_comp=concat_comp,edge_format=data_src)
-net            = the_network.to(device)
+net = GATGNN(n_heads,classification,neurons=number_neurons,nl=number_layers,xtra_layers=xtra_l,global_attention=global_att,
+                unpooling_technique=attention_technique,concat_comp=concat_comp,edge_format=data_src)
 
-# LOSS & OPTMIZER & SCHEDULER
-if classification == 1: criterion   = nn.CrossEntropyLoss().cuda(); funct = torch_accuracy
-else                  : criterion   = nn.SmoothL1Loss().cuda()    ; funct = torch_MAE
-optimizer         = optim.AdamW(net.parameters(), lr = learning_rate, weight_decay = 1e-1)
-scheduler         = lr_scheduler.MultiStepLR(optimizer, milestones=milestones,gamma=0.3)
 
-# EARLY-STOPPING INITIALIZATION
-early_stopping = EarlyStopping(patience=stop_patience, increment=1e-6,verbose=True,save_best=True,classification=classification)
+# # LOSS & OPTMIZER & SCHEDULER
+# if classification == 1: criterion   = nn.CrossEntropyLoss().cuda(); funct = torch_accuracy
+# else                  : criterion   = nn.SmoothL1Loss().cuda()    ; funct = torch_MAE
+# optimizer         = optim.AdamW(net.parameters(), lr = learning_rate, weight_decay = 1e-1)
+# scheduler         = lr_scheduler.MultiStepLR(optimizer, milestones=milestones,gamma=0.3)
 
-# METRICS-OBJECT INITIALIZATION
-metrics        = METRICS(crystal_property,num_epochs,criterion,funct,device)
+# # EARLY-STOPPING INITIALIZATION
+# early_stopping = EarlyStopping(patience=stop_patience, increment=1e-6,verbose=True,save_best=True,classification=classification)
+
+# # METRICS-OBJECT INITIALIZATION
+# metrics        = METRICS(crystal_property,num_epochs,criterion,funct,device)
 
 print(f'> TRAINING MODEL ...')
-train_loader   = torch_DataLoader(dataset=training_set,   **train_param)
-valid_loader   = torch_DataLoader(dataset=validation_set, **valid_param) 
+train_loader   = paddle_loader(dataset=training_set,   **train_param)
+valid_loader   = paddle_loader(dataset=validation_set, **valid_param) 
+for data in train_loader:
+    
+    x, edge_index, edge_attr   = data.x, data.edge_index,data.edge_attr
+    batch, global_feat,cluster = data.batch,data.global_feature,data.cluster
+    print(f'> --- DATA-SET ---')
+    print(f'> x-SHAPE: {x.shape} | EDGE-INDEX-SHAPE: {edge_index.shape} | EDGE-ATTR-SHAPE: {edge_attr.shape}')
+    print(f'> BATCH-SHAPE: {batch.shape} | GLOBAL-FEATURE-SHAPE: {global_feat.shape} | CLUSTER-SHAPE: {cluster.shape}')
+    print(x[0,:10])
+    print(edge_index[0,:10])
+    print(edge_attr[0,:10])
+    print(batch[:10])
+    print(global_feat[0,:10])
+    print(cluster[:10])
+
+    pre = net(data)
+    break
+exit(0)
+
 for epoch in range(num_epochs):
     # TRAINING-STAGE
     net.train()       
