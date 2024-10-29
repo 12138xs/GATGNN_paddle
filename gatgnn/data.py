@@ -65,11 +65,10 @@ class DATA_normalizer:
         return x * self.std + self.mean
 
 class METRICS:
-    def __init__(self,c_property,epoch,paddle_criterion,paddle_func,device):
+    def __init__(self,c_property,epoch,paddle_criterion,paddle_func):
         self.c_property        = c_property
         self.criterion         = paddle_criterion
         self.eval_func         = paddle_func
-        self.dv                = device
         self.training_measure1 = paddle.to_tensor(0.0)
         self.training_measure2 = paddle.to_tensor(0.0)
         self.valid_measure1    = paddle.to_tensor(0.0)

@@ -1,6 +1,6 @@
 from gatgnn.data                   import *
 from gatgnn.model                  import *
-from gatgnn.pytorch_early_stopping import *
+from gatgnn.paddle_early_stopping import *
 from gatgnn.file_setter            import use_property
 from gatgnn.utils                  import *
 

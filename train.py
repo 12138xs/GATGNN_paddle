@@ -1,6 +1,6 @@
 from gatgnn.data                   import *
 from gatgnn.model                  import *
-# from gatgnn.pytorch_early_stopping import *
+from gatgnn.paddle_early_stopping  import *
 from gatgnn.file_setter            import use_property
 from gatgnn.utils                  import *
 
@@ -56,7 +56,7 @@ print(f'> TRAINING-SIZE: {training_num} | SOURCE-COMPARISON: {source_comparison}
 print(f'> NORMALIZATION: {norm_action} | CLASSIFICATION: {classification}')
 
 # SETTING UP CODE TO RUN ON GPU
-gpu_id = 0
+gpu_id = 3
 paddle.device.set_device(f"gpu:{gpu_id}")
 
 # DATA PARAMETERS
@@ -66,7 +66,7 @@ random.seed(random_num)
 # MODEL HYPER-PARAMETERS
 num_epochs      = 200
 learning_rate   = 5e-3
-batch_size      = 1 # 256
+batch_size      = 256
 
 stop_patience   = 150
 best_epoch      = 1
@@ -94,70 +94,53 @@ validation_set     =  CIF_Lister(val_idx,CRYSTAL_DATA,NORMALIZER,norm_action,  d
 net = GATGNN(n_heads,classification,neurons=number_neurons,nl=number_layers,xtra_layers=xtra_l,global_attention=global_att,
                 unpooling_technique=attention_technique,concat_comp=concat_comp,edge_format=data_src)
 
+# LOSS & OPTMIZER & SCHEDULER
+if classification == 1: criterion   = nn.CrossEntropyLoss(); funct = paddle_accuracy
+else                  : criterion   = nn.SmoothL1Loss()    ; funct = paddle_MAE
+scheduler         = lr.MultiStepDecay(learning_rate, milestones=milestones, gamma=0.3)
+optimizer         = optim.AdamW(learning_rate = scheduler, parameters=net.parameters(), weight_decay = 1e-1)
 
-# # LOSS & OPTMIZER & SCHEDULER
-# if classification == 1: criterion   = nn.CrossEntropyLoss().cuda(); funct = torch_accuracy
-# else                  : criterion   = nn.SmoothL1Loss().cuda()    ; funct = torch_MAE
-# optimizer         = optim.AdamW(net.parameters(), lr = learning_rate, weight_decay = 1e-1)
-# scheduler         = lr_scheduler.MultiStepLR(optimizer, milestones=milestones,gamma=0.3)
 
-# # EARLY-STOPPING INITIALIZATION
-# early_stopping = EarlyStopping(patience=stop_patience, increment=1e-6,verbose=True,save_best=True,classification=classification)
+# EARLY-STOPPING INITIALIZATION
+early_stopping = EarlyStopping(patience=stop_patience, increment=1e-6,verbose=True,save_best=True,classification=classification)
 
-# # METRICS-OBJECT INITIALIZATION
-# metrics        = METRICS(crystal_property,num_epochs,criterion,funct,device)
+# METRICS-OBJECT INITIALIZATION
+metrics        = METRICS(crystal_property,num_epochs,criterion,funct)
 
 print(f'> TRAINING MODEL ...')
 train_loader   = paddle_loader(dataset=training_set,   **train_param)
 valid_loader   = paddle_loader(dataset=validation_set, **valid_param) 
-for data in train_loader:
-    
-    x, edge_index, edge_attr   = data.x, data.edge_index,data.edge_attr
-    batch, global_feat,cluster = data.batch,data.global_feature,data.cluster
-    print(f'> --- DATA-SET ---')
-    print(f'> x-SHAPE: {x.shape} | EDGE-INDEX-SHAPE: {edge_index.shape} | EDGE-ATTR-SHAPE: {edge_attr.shape}')
-    print(f'> BATCH-SHAPE: {batch.shape} | GLOBAL-FEATURE-SHAPE: {global_feat.shape} | CLUSTER-SHAPE: {cluster.shape}')
-    print(x[0,:10])
-    print(edge_index[0,:10])
-    print(edge_attr[0,:10])
-    print(batch[:10])
-    print(global_feat[0,:10])
-    print(cluster[:10])
-
-    pre = net(data)
-    break
-exit(0)
 
 for epoch in range(num_epochs):
     # TRAINING-STAGE
     net.train()       
     start_time       = time.time()
     for data in train_loader:
-        data         = data.to(device)
+        data         = data
         predictions  = net(data)
         train_label  = metrics.set_label('training',data)
         loss         = metrics('training',predictions,train_label,1)
         _            = metrics('training',predictions,train_label,2)
 
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        optimizer.clear_grad()
 
         metrics.training_counter+=1
     metrics.reset_parameters('training',epoch)
+
     # VALIDATION-PHASE
     net.eval()
     for data in valid_loader:
-        data = data.to(device)
-        with torch.no_grad():
-            predictions    = net(data)
+        data = data
+        predictions    = net(data)
         valid_label        = metrics.set_label('validation',data)
         _                  = metrics('validation',predictions,valid_label,1)
         _                  = metrics('validation',predictions, valid_label,2)
 
         metrics.valid_counter+=1
-
     metrics.reset_parameters('validation',epoch)
+
     scheduler.step()
     end_time         = time.time()
     e_time           = end_time-start_time
@@ -174,6 +157,7 @@ for epoch in range(num_epochs):
     if early_stopping.early_stop:
         print("> Early stopping")
         break
+
 # SAVING MODEL
 print(f"> DONE TRAINING !")
-shutil.copy2('TRAINED/crystal-checkpoint.pt', f'TRAINED/{crystal_property}.pt')
+shutil.copy2('TRAINED/crystal-checkpoint.pdparams', f'TRAINED/{crystal_property}.pdparams')

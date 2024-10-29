@@ -12,12 +12,7 @@ from   paddle.optimizer import lr
 
 # import torch.optim as optim
 # from   torch.optim import lr_scheduler 
-
-
-
-
 # from torch_geometric.nn.conv  import MessagePassing
-
 # from torch_geometric.nn       import global_add_pool
 # from torch_geometric.nn       import GATConv
 # from torch_scatter            import scatter_add
@@ -51,7 +46,7 @@ class COMPOSITION_Attention(nn.Layer):
         counts      = paddle.unique(batch,return_counts=True)[-1]
         graph_embed = global_feat
         graph_embed = paddle.repeat_interleave(graph_embed, counts, axis=0)
-        chunk       = paddle.concatt([x,graph_embed],axis=-1)
+        chunk       = paddle.concat([x,graph_embed],axis=-1)
         x           = F.softplus(self.node_layer1(chunk))
         x           = self.atten_layer(x)
         weights     = softmax(x,batch,counts.shape[0])
@@ -100,9 +95,9 @@ class CLUSTER_Attention(nn.Layer):
             cluster_sum    = scatter_add(graph_features,clus_t,0)
             zero_sum       = paddle.zeros_like(cluster_sum)
             if   len(graph_features) == 1: 
-                new_x = paddle.concatt([new_x,cluster_sum],axis=0)
+                new_x = paddle.concat([new_x,cluster_sum],axis=0)
             elif len(graph_features) == 2:
-                new_x = paddle.concatt([new_x,cluster_sum,cluster_sum],axis=0)
+                new_x = paddle.concat([new_x,cluster_sum,cluster_sum],axis=0)
             else:
                 region_arr  = np.array(clus_t.tolist())
                 # choosing unpooling method
@@ -112,7 +107,7 @@ class CLUSTER_Attention(nn.Layer):
                     random_sets  = [np.random.choice(np.setdiff1d(region_arr,e)) for e in region_arr]
                 elif self.clustering_method == 'learnable':  #--- GI M-4
                     total_feat   = graph_features.sum(axis=0).unsqueeze(0)
-                    region_input = paddle.concatt([graph_features,total_feat,clus_t.unsqueeze(0).float()],axis=-1)
+                    region_input = paddle.concat([graph_features,total_feat,clus_t.unsqueeze(0).float()],axis=-1)
                     random_sets  = paddle.argmax(F.softmax(self.learn_unpool(region_input)),axis=1).tolist()
 
                 # normalized-regions
@@ -124,7 +119,7 @@ class CLUSTER_Attention(nn.Layer):
                 
                 cluster_sum = cluster_sum[random_sets]
                 cluster_sum = cluster_sum*random_ratio
-                new_x       = paddle.concatt([new_x,cluster_sum],axis=0)
+                new_x       = paddle.concat([new_x,cluster_sum],axis=0)
         return new_x        
 
 class GAT_Crystal(MessagePassing):
@@ -172,7 +167,6 @@ class GAT_Crystal(MessagePassing):
         edge_index_i = edge_index[0]
         edge_index_j = edge_index[1]
         size_i = x_i.shape[0]
-        print("===>",x.shape,edge_index.shape,edge_attr.shape,x_i.shape,x_j.shape,size_i,edge_attr.shape)
         return self.propagate(x=x, edge_index=edge_index, edge_index_i=edge_index_i, x_i=x_i, x_j=x_j, size_i=size_i, edge_attr=edge_attr)
 
     def message(self, edge_index_i, x_i, x_j, size_i, edge_attr): 
@@ -239,12 +233,7 @@ class GATGNN(nn.Layer):
     def forward(self,data):
         x, edge_index, edge_attr   = data.x, data.edge_index,data.edge_attr
         batch, global_feat,cluster = data.batch,data.global_feature,data.cluster
-        print(f'> --- DATA-SET ---')
-        print(f'> x-SHAPE: {x.shape} | EDGE-INDEX-SHAPE: {edge_index.shape} | EDGE-ATTR-SHAPE: {edge_attr.shape}')
-        print(f'> BATCH-SHAPE: {batch.shape} | GLOBAL-FEATURE-SHAPE: {global_feat.shape} | CLUSTER-SHAPE: {cluster.shape}')
-        print(x.dtype,edge_index.dtype,edge_attr.dtype,batch.dtype,global_feat.dtype,cluster.dtype)
-        print("--"*20)
-        
+
         x           = self.embed_n(x)
         edge_attr   = F.leaky_relu(self.embed_e(edge_attr),self.neg_slope)
 
@@ -252,23 +241,23 @@ class GATGNN(nn.Layer):
             x     = self.node_att[a_idx](x,edge_index,edge_attr)
             x     = self.batch_norm[a_idx](x)
             x     = F.softplus(x)
-        
+
         if   self.g_a in ['cluster', 'unpooling', 'clustering']:
             ar        = self.cluster_att(x,cluster,batch)
             x         = (x)*ar
         elif self.g_a =='composition':
             ag        = self.comp_atten(x,batch,global_feat)
             x         = (x)*ag
-        
+
         # CRYSTAL FEATURE-AGGREGATION 
         y         = global_sum_pool(x,batch).unsqueeze(1).squeeze()
+        if y.dim() == 1: y = y.unsqueeze(0)
         if self.concat_comp:
             y     = paddle.concat([y,F.leaky_relu(self.embed_comp(global_feat),self.neg_slope)],axis=-1)
 
         if self.additional:
             y = F.softplus(self.linear1(y))
             y = F.softplus(self.linear2(y))
-
         if self.classification: y = self.out(y)
-        else:                   y = self.out(y).squeeze()
+        else:                   y = self.out(y).squeeze(axis=-1)
         return y

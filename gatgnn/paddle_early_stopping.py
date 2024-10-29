@@ -26,13 +26,17 @@ LINK:  https://github.com/Bjarten/early-stopping-pytorch
 ====
 '''
 
-import numpy as np
-import torch
-
-
-# ----------- Steph-Yves Modified ----------------------------------------------------------- #
+# ----------- Steph-Yves Modified for GATGNN ------------------------------------------------
 # ===========================================================================================
 # -------------------------------------------------------------------------------------------
+
+# ----------- CenJH Modified for GATGNN_paddle ----------------------------------------------
+# ===========================================================================================
+# -------------------------------------------------------------------------------------------
+
+import numpy as np
+import paddle
+
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
@@ -45,17 +49,17 @@ class EarlyStopping:
                             Default: False
         """
         self.classification = classification
-        self.patience      = patience
-        self.verbose       = verbose
-        self.counter       = 0
-        self.best_score    = None
-        self.early_stop    = False
-        self.val_loss_min  = np.Inf
+        self.patience       = patience
+        self.verbose        = verbose
+        self.counter        = 0
+        self.best_score     = None
+        self.early_stop     = False
+        self.val_loss_min   = np.Inf
 
-        self.increment     = increment            
-        self.flag_value    = f' *** '                 
-        self.FLAG          = None        
-        self.save_best     = save_best         
+        self.increment      = increment            
+        self.flag_value     = f' *** '                 
+        self.FLAG           = None        
+        self.save_best      = save_best         
 
     def __call__(self, val_loss, model):
         score = -val_loss
@@ -87,6 +91,6 @@ class EarlyStopping:
     def save_checkpoint(self, val_loss, model):
         '''Saves model when validation loss decrease.'''
         if self.verbose: pass
-        torch.save(model.state_dict(), 'TRAINED/crystal-checkpoint.pt')
+        paddle.save(model.state_dict(), 'TRAINED/crystal-checkpoint.pdparams')
         self.val_loss_min = val_loss
         self.FLAG         = False
