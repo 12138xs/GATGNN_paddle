@@ -1,6 +1,6 @@
 from gatgnn.data                   import *
 from gatgnn.model                  import *
-from gatgnn.paddle_early_stopping import *
+from gatgnn.paddle_early_stopping  import *
 from gatgnn.file_setter            import use_property
 from gatgnn.utils                  import *
 
@@ -52,7 +52,7 @@ concat_comp                          = args.concat_comp
 
 # SETTING UP CODE TO RUN ON GPU
 gpu_id = 0
-device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
+paddle.device.set_device(f"gpu:{gpu_id}")
 
 # MODEL HYPER-PARAMETERS
 learning_rate   = 5e-3
@@ -73,29 +73,25 @@ testing_set           = CIF_Lister(test_idx,CRYSTAL_DATA,NORMALIZER,norm_action,
 
 
 # NEURAL-NETWORK
-the_network    = GATGNN(n_heads,classification,neurons=number_neurons,nl=number_layers,xtra_layers=xtra_l,global_attention=global_att,
-                                      unpooling_technique=attention_technique,concat_comp=concat_comp,edge_format=data_src)
-net            = the_network.to(device)
+net = GATGNN(n_heads,classification,neurons=number_neurons,nl=number_layers,xtra_layers=xtra_l,global_attention=global_att,
+                unpooling_technique=attention_technique,concat_comp=concat_comp,edge_format=data_src)
 
 # LOSS & OPTMIZER & SCHEDULER
-if classification == 1: criterion   = nn.CrossEntropyLoss().cuda(); funct = torch_accuracy
-else                  : criterion   = nn.SmoothL1Loss().cuda()    ; funct = torch_MAE
-optimizer         = optim.AdamW(net.parameters(), lr = learning_rate, weight_decay = 1e-1)
+if classification == 1: criterion   = nn.CrossEntropyLoss(); funct = paddle_accuracy
+else                  : criterion   = nn.SmoothL1Loss()    ; funct = paddle_MAE
 
 # LOADING MODEL
-net = the_network.to(device)
-net.load_state_dict(torch.load(f'TRAINED/{crystal_property}.pt',map_location=device))
+net.set_state_dict(paddle.load(f'TRAINED/{crystal_property}.pdparams'))
 
 # METRICS-OBJECT INITIALIZATION
-metrics        = METRICS(crystal_property,0,criterion,funct,device)
+metrics        = METRICS(crystal_property,0,criterion,funct)
 
 print(f'> PREDICTING MATERIAL-PROPERTY ...')
 # TESTING PHASE
-test_loader    = torch_DataLoader(dataset=testing_set,    **test_param)
+test_loader    = paddle_loader(dataset=testing_set,    **test_param)
 net.eval()
 
 for data in test_loader:
-    data        = data.to(device)
-    with torch.no_grad():
-        prediction = net(data)
+    data        = data
+    prediction = net(data)
     print(f'> {crystal_property} of material ({material_name}.cif) = {prediction:.4}')

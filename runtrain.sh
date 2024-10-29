@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Run the GATGNN model
+# Train the GATGNN model
 TL_BACKEND="paddle" python train.py --property bulk-modulus \
                                     --data_src CGCNN \
                                     --num_layers 3 \

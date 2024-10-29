@@ -1,2 +1,8 @@
+# directories
 DATA/
+RESULTS/
+TRAINED/
+
+# files
+DATA
 *.log
