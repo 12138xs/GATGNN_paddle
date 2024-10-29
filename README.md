@@ -183,3 +183,14 @@ python -m pip install paddlepaddle-gpu==2.3.2.post112 -f https://www.paddlepaddl
 # CUDA 11.6
 python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
 ```
+
+### 流程
+
+```bash
+conda create -n pd310 python=3.10
+conda activate pd310
+python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+pip install git+https://github.com/dddg617/tensorlayerx.git@nightly
+pip install pybind11 pyparsing pandas tqdm pymatgen
+./runtrain.sh
+```

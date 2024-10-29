@@ -33,6 +33,7 @@ class Inspector(object):
 
         """
         params = inspect.signature(func).parameters
+        params = OrderedDict(params)
         if pop_first:
             params.popitem(last=False)
         self.params[func.__name__] = params
