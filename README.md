@@ -1,7 +1,29 @@
 # GATGNN: Global Attention Graph Neural Network
 This software package implements our developed model GATGNN for improved inorganic materials' property prediction. This is the official Pytorch repository. 
 
-## This model is outdated. If you want to compare with our latest model, check our DeeperGATGNN [here](https://github.com/usccolumbia/deeperGATGNN) which has achieved significantly better performance.
+
+# paddle版本部署流程
+
+```bash
+conda create -n paddle39 python=3.9
+conda activate paddle39
+
+pip install --upgrade pip
+pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+
+pip install git+https://github.com/dddg617/tensorlayerx.git@nightly
+pip install pybind11 pyparsing pymatgen
+
+git clone --recursive https://github.com/BUPT-GAMMA/GammaGL.git
+cd GammaGL
+python setup.py install
+
+cd /path/to/GATGNN/
+./runtrain.sh
+```
+
+# OLD VERSION
 
 [Machine Learning and Evolution Laboratory](http://mleg.cse.sc.edu)<br />
 Department of Computer Science and Engineering <br />
@@ -10,14 +32,14 @@ University of South Carolina <br />
 How to cite:<br />
 Louis, Steph-Yves, Yong Zhao, Alireza Nasiri, Xiran Wang, Yuqi Song, Fei Liu, and Jianjun Hu*. "Graph convolutional neural networks with global attention for improved materials property prediction." Physical Chemistry Chemical Physics 22, no. 32 (2020): 18141-18148.
 
-# Table of Contents
+## Table of Contents
 * [Introduction](#introduction)
 * [Installation](#installation)
 * [Dataset](#dataset)
 * [Usage](#usage)
 * [Usage for custom property & custom Dataset](#usage2)
 
-# Performance summary
+## Performance summary
 Property | MAE Performance of our model| Units
 ------------ | ------------- | -------------
 Formation Energy | 0.039 | eV/atom
@@ -134,63 +156,3 @@ python evaluate.py --property new-property --data_src NEW --train_size 0.8
 python predict.py --property new-property --data_src NEW --to_predict mp-1
 ```
 
-
-```bash
-环境支持
-Python 版本 3.6/3.7/3.8/3.9/3.10
-PIP安装方式
-Windows 安装
-GPU版本支持CUDA 10.1/10.2/11.1/11.2/11.6，且仅支持单卡
-
-# CPU only
-python -m pip install paddlepaddle==2.3.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# CUDA 10.1
-python -m pip install paddlepaddle-gpu==2.3.2.post101 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
-
-# CUDA 10.2
-python -m pip install paddlepaddle-gpu==2.3.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# CUDA 11.1
-python -m pip install paddlepaddle-gpu==2.3.2.post111 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
-
-# CUDA 11.2
-python -m pip install paddlepaddle-gpu==2.3.2.post112 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
-
-# CUDA 11.6
-python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
-MacOS 安装
-该版本MacOS不支持GPU版本
-
-# CPU only
-python -m pip install paddlepaddle==2.3.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-Linux 安装
-# CPU only
-python -m pip install paddlepaddle==2.3.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# CUDA 10.1
-python -m pip install paddlepaddle-gpu==2.3.2.post101 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-
-# CUDA 10.2
-python -m pip install paddlepaddle-gpu==2.3.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# CUDA 11.1
-python -m pip install paddlepaddle-gpu==2.3.2.post111 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-
-# CUDA 11.2
-python -m pip install paddlepaddle-gpu==2.3.2.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-
-# CUDA 11.6
-python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-```
-
-### 流程
-
-```bash
-conda create -n pd310 python=3.10
-conda activate pd310
-python -m pip install paddlepaddle-gpu==2.3.2.post116 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-pip install git+https://github.com/dddg617/tensorlayerx.git@nightly
-pip install pybind11 pyparsing pandas tqdm pymatgen
-./runtrain.sh
-```
