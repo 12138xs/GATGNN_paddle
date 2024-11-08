@@ -1,4 +1,0 @@
-{
-  "tlx_backend": "torch",
-  "dataset_root": "@datasets"
-}
