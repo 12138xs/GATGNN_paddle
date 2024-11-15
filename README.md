@@ -1,31 +1,38 @@
-# GATGNN: Global Attention Graph Neural Network
+# GATGNN: 全局注意力图神经网络
 
-This software package implements our GATGNN for improved inorganic materials' property prediction. This is the `paddlepaddle` implementation repository.
+此软件包实现了我们的GATGNN，用于改进无机材料的属性预测。这是`paddlepaddle`实现的代码库。
 
-## Table of Contents
-- [Introduction](#introduction)
-- [Installation](#installation)
-- [Dataset](#dataset)
-- [Usage](#usage)
-- [Usage for Custom Property & Custom Dataset](#usage-for-custom-property--custom-dataset)
-- [Official PyTorch Version](#official-pytorch-version)
+## 目录
+- [GATGNN: 全局注意力图神经网络](#gatgnn-全局注意力图神经网络)
+  - [目录](#目录)
+  - [简介](#简介)
+  - [安装](#安装)
+    - [所需软件包](#所需软件包)
+    - [GammaGL修改](#gammagl修改)
+  - [数据集](#数据集)
+  - [使用方法](#使用方法)
+    - [训练新模型](#训练新模型)
+    - [评估训练模型的性能](#评估训练模型的性能)
+    - [使用CIF文件预测单个无机材料的属性](#使用cif文件预测单个无机材料的属性)
+  - [自定义属性和数据集的使用方法](#自定义属性和数据集的使用方法)
+  - [官方PyTorch版本](#官方pytorch版本)
 
-## Introduction
+## 简介
 
-The package provides three major functions:
+该软件包提供三个主要功能：
 
-- Train a GATGNN model for any of the seven properties referenced.
-- Evaluate the performance of a trained GATGNN model on these properties.
-- Predict the property of a given material using its CIF file.
+- 训练一个用于任意七种属性的GATGNN模型。
+- 评估训练好的GATGNN模型在这些属性上的性能。
+- 使用CIF文件预测给定材料的属性。
 
-The following paper describes the details of our framework:
-[Global Attention Based Graph Convolutional Neural Networks for Improved Materials Property Prediction](https://arxiv.org/pdf/2003.13379.pdf)
+以下论文描述了我们框架的详细信息：
+[基于全局注意力的图卷积神经网络用于改进材料属性预测](https://arxiv.org/pdf/2003.13379.pdf)
 
 ![GATGNN](docs/front-pic.png)
 
-## Installation
+## 安装
 
-### Required Packages
+### 所需软件包
 
 ```bash
 conda create -n paddle39 python=3.9
@@ -43,11 +50,11 @@ cd GammaGL
 python setup.py install
 ```
 
-### GammaGL Modification
+### GammaGL修改
 
-Modify the following code in GammaGL:
+在GammaGL中修改以下代码：
 
-Original Implementation:
+原始实现：
 
 ```python
 def unsorted_segment_sum(x, segment_ids, num_segments=None):
@@ -71,7 +78,7 @@ def unsorted_segment_sum(x, segment_ids, num_segments=None):
         return final_output
 ```
 
-New Implementation:
+新的实现：
 
 ```python
 def unsorted_segment_sum(x, segment_ids, num_segments=None):
@@ -109,98 +116,97 @@ def unsorted_segment_sum(x, segment_ids, num_segments=None):
             return final_output
 ```
 
-## Dataset
+## 数据集
 
-1. Download the compressed file of our dataset using [this link](https://widgets.figshare.com/articles/12522524/embed?show_title=1).
-2. Unzip its content (a directory named 'DATA').
-3. Move the DATA directory into your GATGNN directory, so the path `GATGNN/DATA` now exists.
+1. 使用[此链接](https://widgets.figshare.com/articles/12522524/embed?show_title=1)下载我们数据集的压缩文件。
+2. 解压其内容（一个名为'DATA'的目录）。
+3. 将DATA目录移动到您的GATGNN目录中，使得路径`GATGNN/DATA`现在存在。
 
-## Usage
+## 使用方法
 
-### Training a New Model
+### 训练新模型
 
-Once all the aforementioned requirements are satisfied, you can train a new GATGNN by running `train.py` in the terminal along with the appropriate flags. At a minimum, use `--property` to specify the property and `--data_src` to identify the dataset (CGCNN or MEGNET). The details can be found in `runtrain.sh`.
+满足所有上述要求后，您可以通过在终端中运行`train.py`并附上适当的标志来训练新的GATGNN。至少使用`--property`指定属性和`--data_src`识别数据集（CGCNN或MEGNET）。详细信息可在`runtrain.sh`中找到。
 
-- Example 1: Train a model on the bulk-modulus property using the CGCNN dataset.
+- 示例1：使用CGCNN数据集训练一个关于体积模量属性的模型。
   ```bash
   python train.py --property bulk-modulus --data_src CGCNN
   ```
-- Example 2: Train a model on the shear-modulus property using the MEGNET dataset.
+- 示例2：使用MEGNET数据集训练一个关于剪切模量属性的模型。
   ```bash
   python train.py --property shear-modulus --data_src MEGNET
   ```
-- Example 3: Train a model with 5 layers on the bulk-modulus property using the CGCNN dataset and the global attention technique of fixed cluster unpooling (GI M-2).
+- 示例3：使用CGCNN数据集和固定集群解卷积（GI M-2）的全局注意力技术训练一个5层的体积模量模型。
   ```bash
   python train.py --property bulk-modulus --data_src CGCNN --num_layers 5 --global_attention cluster --cluster_option fixed
   ```
 
-The trained model will be automatically saved under the TRAINED directory. *Pay attention to the flags used as they will be needed again to evaluate the model.*
+训练好的模型将自动保存在TRAINED目录下。*注意使用的标志，因为在评估模型时需要再次使用它们。*
 
-### Evaluating the Performance of a Trained Model
+### 评估训练模型的性能
 
-After training a GATGNN, evaluate its performance using `evaluate.py` in the terminal exactly as `train.py`. *It is IMPORTANT to run `evaluate.py` with the exact same flags used during the training.* The details can be found in `runtest.sh`.
+训练GATGNN后，可以使用`evaluate.py`在终端中评估其性能，方法与`train.py`完全相同。*重要的是，运行`evaluate.py`时必须使用与训练时完全相同的标志。*详细信息可在`runtest.sh`中找到。
 
-- Example 1: Evaluate the performance of a model trained on the bulk-modulus property using the CGCNN dataset.
+- 示例1：评估使用CGCNN数据集训练的体积模量模型的性能。
   ```bash
   python evaluate.py --property bulk-modulus --data_src CGCNN
   ```
-- Example 2: Evaluate the performance of a model trained on the shear-modulus property using the MEGNET dataset.
+- 示例2：评估使用MEGNET数据集训练的剪切模量模型的性能。
   ```bash
   python evaluate.py --property shear-modulus --data_src MEGNET
   ```
-- Example 3: Evaluate the performance of a model trained with 5 layers on the bulk-modulus property using the CGCNN dataset and the global attention technique of fixed cluster unpooling (GI M-2).
+- 示例3：评估使用CGCNN数据集和固定集群解卷积（GI M-2）的全局注意力技术训练的5层体积模量模型的性能。
   ```bash
   python evaluate.py --property bulk-modulus --data_src CGCNN --num_layers 5 --global_attention cluster --cluster_option fixed
   ```
 
-### Predicting the Property of a Single Inorganic Material Using Its CIF File
+### 使用CIF文件预测单个无机材料的属性
 
-Using a trained model, you can predict the property of a single inorganic material using its CIF file. Follow these steps:
+使用训练好的模型，您可以通过CIF文件预测单个无机材料的属性。请遵循以下步骤：
 
-1. Place your CIF file inside the directory `DATA/prediction-directory/`.
-2. Run `predict.py` similarly to `evaluate.py`, with the addition of the `--to_predict` flag to specify the name of the CIF file.
+1. 将您的CIF文件放置在目录`DATA/prediction-directory/`中。
+2. 运行`predict.py`，与`evaluate.py`类似，但需添加`--to_predict`标志来指定CIF文件的名称。
 
-- Example 1: Predict the bulk-modulus property of a material named mp-1 using the CGCNN graph constructing specifications.
+- 示例1：使用CGCNN图构建规范预测名为mp-1的材料的体积模量属性。
   ```bash
   python predict.py --property bulk-modulus --data_src CGCNN --to_predict mp-1
   ```
-- Example 2: Predict the shear-modulus property of a material named mp-1 using the MEGNET graph constructing specifications.
+- 示例2：使用MEGNET图构建规范预测名为mp-1的材料的剪切模量属性。
   ```bash
   python predict.py --property shear-modulus --data_src MEGNET --to_predict mp-1
   ```
 
-## Usage for Custom Property & Custom Dataset
+## 自定义属性和数据集的使用方法
 
-Once you've downloaded and unzipped the dataset, follow these steps:
+下载并解压数据集后，请遵循以下步骤：
 
-1. Place all of your CIF files in the directory `DATA/CIF-DATA_NEW`.
-2. Format your CSV property dataset to have only two columns (ID, value). Your file should look like any of our CSV files located in the directory `DATA/properties-reference/`.
-3. Once your CSV property dataset is correctly formatted, rename your file as `newproperty.csv` and place it in the `DATA/properties_reference/` directory.
+1. 将所有CIF文件放置在目录`DATA/CIF-DATA_NEW`中。
+2. 格式化您的CSV属性数据集，使其只有两列（ID，value）。您的文件应类似于我们位于目录`DATA/properties-reference/`中的任何CSV文件。
+3. 一旦您的CSV属性数据集格式正确，请将文件重命名为`newproperty.csv`并放置在`DATA/properties_reference/`目录中。
 
-With these steps complete, you are ready to use our GATGNN on your own dataset. To either [train](#usage), [evaluate](#usage), or even [predict](#usage) your own property, refer to the instructions listed in the [Usage](#usage) section. Use `new-property`, `NEW`, and any ratio (like 0.75) as values for the `--property` flag, `--data_src` flag, and `--train_size` flag. Examples are provided below:
+完成这些步骤后，您就可以在自己的数据集上使用我们的GATGNN。要[训练](#使用方法)、[评估](#使用方法)或[预测](#使用方法)您自己的属性，请参考[使用方法](#使用方法)部分中列出的说明。对于`--property`标志、`--data_src`标志和`--train_size`标志，使用`new-property`、`NEW`和任何比例（如0.75）作为值。示例如下：
 
-- Example 1: Train a new GATGNN on your property.
+- 示例1：训练一个新的GATGNN以预测您的属性。
   ```bash
   python train.py --property new-property --data_src NEW --train_size 0.8
   ```
-- Example 2: Evaluate the performance of a model trained on your property.
+- 示例2：评估在您的属性上训练的模型的性能。
   ```bash
   python evaluate.py --property new-property --data_src NEW --train_size 0.8
   ```
-- Example 3: Predict the value of your property for a material named mp-1.
+- 示例3：预测名为mp-1的材料的属性值。
   ```bash
   python predict.py --property new-property --data_src NEW --to_predict mp-1
   ```
 
-## Official PyTorch Version
+## 官方PyTorch版本
 
-For the official PyTorch version of GATGNN, visit the [GATGNN repository](https://github.com/superlouis/GATGNN).
+有关GATGNN的官方PyTorch版本，请访问[GATGNN代码库](https://github.com/superlouis/GATGNN)。
 
-[Machine Learning and Evolution Laboratory](http://mleg.cse.sc.edu)  
-Department of Computer Science and Engineering
+[机器学习与进化实验室](http://mleg.cse.sc.edu)  
+计算机科学与工程系
 
-
-How to cite:
+引用：
 ```bibtex
 Louis, Steph-Yves, Yong Zhao, Alireza Nasiri, Xiran Wang, Yuqi Song, Fei Liu, and Jianjun Hu*. "Graph convolutional neural networks with global attention for improved materials property prediction." Physical Chemistry Chemical Physics 22, no. 32 (2020): 18141-18148.
 ```
